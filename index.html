@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CiteVerify - Field-Aware Academic Citation Engine</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Mammoth.js for Microsoft Word (.docx) Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- PDF.js for PDF Document Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- docx.js for Microsoft Word Document Export -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    
+    <script>
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+    </script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.8);
+        }
+        .citation-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.1rem 0.4rem;
+            margin: 0 0.2rem;
+            font-size: 0.825rem;
+            font-weight: 600;
+            color: #818cf8;
+            background-color: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(129, 140, 248, 0.3);
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .citation-badge:hover {
+            background-color: rgba(99, 102, 241, 0.3);
+            border-color: #818cf8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+        /* Custom styled native select dropdown items for cross-platform visual consistency */
+        select option {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            padding: 8px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-200 bg-slate-950">
+
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-lg text-white tracking-tight">CiteVerify</span>
+                        <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Strict Field Isolation
+                        </span>
+                        <span class="px-2 py-0.5 text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded-full flex items-center gap-1">
+                            <i class="fa-solid fa-shield-halved text-[10px]"></i> Non-Hallucination Engine
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Broad Retrieval → Discipline Exclusion → Re-Rank → Verification Funnel</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-4 text-xs text-slate-400 border-r border-slate-800 pr-4">
+                    <span class="flex items-center gap-1.5" title="PubMed / EuropePMC Medical Engine Active">
+                        <i class="fa-solid fa-stethoscope text-rose-400"></i> PubMed/EuropePMC
+                    </span>
+                    <span class="flex items-center gap-1.5" title="Crossref Official Registry API Linked">
+                        <i class="fa-solid fa-database text-brand-400"></i> Scoped Crossref
+                    </span>
+                    <span class="flex items-center gap-1.5" title="arXiv & OpenAlex Access Linked">
+                        <i class="fa-solid fa-atom text-cyan-400"></i> arXiv / OpenAlex
+                    </span>
+                </div>
+                <button id="btn-reset" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-rotate-left text-slate-400"></i> Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
+
+        <!-- Configuration Banner -->
+        <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col gap-4 shadow-lg backdrop-blur-sm">
+            
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div class="flex items-start gap-3">
+                    <div class="p-2.5 bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded-xl mt-0.5">
+                        <i class="fa-solid fa-filter-circle-dollar text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-sm font-semibold text-slate-100">Discipline Filter & Strict Medical Safeguards</h1>
+                        <p class="text-xs text-slate-400 mt-0.5 max-w-2xl">
+                            Each sentence claim undergoes domain-scoped query expansion, hard engineering/CS venue exclusion (in Medical mode), biomedical TF-IDF re-ranking, and verified DOI matching.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Field / Database Selector -->
+                <div class="w-full md:w-auto flex items-center">
+                    <div class="w-full flex items-center gap-2 bg-slate-950 border border-rose-500/30 ring-1 ring-rose-500/20 rounded-xl p-2 px-3 shadow-lg">
+                        <label for="select-field" class="text-xs font-semibold text-rose-400 whitespace-nowrap flex items-center gap-1.5">
+                            <i class="fa-solid fa-flask-vial text-rose-400"></i> Research Field:
+                        </label>
+                        <select id="select-field" class="bg-slate-900 text-xs text-slate-100 font-bold border border-slate-800 focus:ring-1 focus:ring-brand-500 cursor-pointer outline-none w-full md:w-64 rounded-lg p-1.5">
+                            <option value="med" selected>Medical & Health Sciences (PubMed / EuropePMC)</option>
+                            <option value="life">Life Sciences & Biology (EuropePMC / OpenAlex)</option>
+                            <option value="eng">Engineering & CS (arXiv / IEEE / CS)</option>
+                            <option value="phys">Physics & Mathematics (arXiv / MathSciNet)</option>
+                            <option value="social">Social Sciences & Humanities (Crossref)</option>
+                            <option value="multi">Multidisciplinary (Crossref Registry)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Citation Engine Settings Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-slate-800/80">
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-citation-style" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-quote-right text-brand-400 mr-1"></i>Format:</label>
+                    <select id="select-citation-style" class="bg-slate-900 text-xs text-slate-200 font-medium border border-slate-800 focus:ring-0 cursor-pointer outline-none w-full rounded p-1">
+                        <option value="apa" selected>APA 7th (Author et al., 2024)</option>
+                        <option value="vancouver">Vancouver (1)</option>
+                        <option value="nlm">NLM (National Library of Medicine) ¹</option>
+                        <option value="ieee">IEEE [1]</option>
+                        <option value="harvard">Harvard (Author et al., 2024)</option>
+                        <option value="mla">MLA 9th (Author 2024)</option>
+                        <option value="chicago">Chicago Author-Date (Author 2024)</option>
+                        <option value="combined">Combined [1, Author et al., 2024]</option>
+                        <option value="numeric">Numerical Bracketed [1]</option>
+                        <option value="superscript">Superscript Numerical ¹</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-citation-pos" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-arrows-left-right text-brand-400 mr-1"></i>Punctuation:</label>
+                    <select id="select-citation-pos" class="bg-slate-900 text-xs text-slate-200 font-medium border border-slate-800 focus:ring-0 cursor-pointer outline-none w-full rounded p-1">
+                        <option value="before" selected>Before Period (Sentence [1].)</option>
+                        <option value="after">After Period (Sentence. [1])</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-density" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-list-ol text-brand-400 mr-1"></i>Density:</label>
+                    <select id="select-density" class="bg-slate-900 text-xs text-slate-200 font-medium border border-slate-800 focus:ring-0 cursor-pointer outline-none w-full rounded p-1">
+                        <option value="standard" selected>Standard (1-2 / Para)</option>
+                        <option value="dense">Dense (Up to 3)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-recency" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-calendar-days text-brand-400 mr-1"></i>Recency:</label>
+                    <select id="select-recency" class="bg-slate-900 text-xs text-slate-200 font-medium border border-slate-800 focus:ring-0 cursor-pointer outline-none w-full rounded p-1">
+                        <option value="latest" selected>Latest Preferred (2020–2026)</option>
+                        <option value="strictly_recent">Strictly Most Recent (Sort Year)</option>
+                        <option value="relevance">Relevance / Classic (All Years)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg p-1.5 px-3">
+                    <label for="select-min-confidence" class="text-xs text-slate-400 whitespace-nowrap"><i class="fa-solid fa-shield text-brand-400 mr-1"></i>Min Score:</label>
+                    <select id="select-min-confidence" class="bg-slate-900 text-xs text-slate-200 font-medium border border-slate-800 focus:ring-0 cursor-pointer outline-none w-full rounded p-1">
+                        <option value="high" selected>High Confidence (Score ≥ 0.30)</option>
+                        <option value="strict">Strict Verification (Score ≥ 0.45)</option>
+                        <option value="medium">Moderate Match (Score ≥ 0.20)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[550px]">
+            
+            <!-- Left Input Column -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div class="bg-slate-900/90 border-b border-slate-800 p-3 px-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-file-lines text-slate-400 text-sm"></i>
+                        <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Source Manuscript Text</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-load-medical" class="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition flex items-center gap-1">
+                            <i class="fa-solid fa-heart-pulse"></i> Sample Medical Paper
+                        </button>
+                        <label for="file-upload" class="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 cursor-pointer transition flex items-center gap-1">
+                            <i class="fa-solid fa-upload text-slate-400"></i> Upload File
+                            <input id="file-upload" type="file" accept=".txt,.md,.doc,.docx,.pdf" class="hidden" />
+                        </label>
+                    </div>
+                </div>
+
+                <div class="flex-1 relative p-4 flex flex-col">
+                    <textarea id="input-text" class="w-full h-full flex-1 min-h-[380px] bg-transparent text-slate-200 placeholder-slate-600 text-sm leading-relaxed border-none focus:ring-0 outline-none resize-none font-sans" placeholder="Paste your medical, health science, engineering, or academic manuscript here..."></textarea>
+                    
+                    <div class="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                        <span id="text-stats">0 words | 0 characters</span>
+                        <span class="text-amber-400 flex items-center gap-1 font-medium">
+                            <i class="fa-solid fa-shield-halved text-amber-400"></i> Protected: Headings, Abstract, Tables & Figures
+                        </span>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-slate-800 bg-slate-900/80">
+                    <button id="btn-process" class="w-full py-3 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold text-sm rounded-xl shadow-lg shadow-brand-600/30 hover:shadow-brand-500/50 transition duration-200 flex items-center justify-center gap-2 group">
+                        <i class="fa-solid fa-microscope text-brand-200 group-hover:scale-110 transition-transform"></i>
+                        <span>Execute 6-Stage Citation Engine</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Output Column -->
+            <div class="flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl relative">
+                <div class="bg-slate-900/90 border-b border-slate-800 p-3 px-4 flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-square-poll-vertical text-brand-400 text-sm"></i>
+                        <span class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Cited Manuscript & References</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="btn-copy-text" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1">
+                            <i class="fa-regular fa-copy"></i> Copy Text
+                        </button>
+                        <button id="btn-download" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1" title="Download as Markdown">
+                            <i class="fa-solid fa-file-code text-slate-400"></i> (.md)
+                        </button>
+                        <button id="btn-download-docx" disabled class="disabled:opacity-40 disabled:cursor-not-allowed text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded border border-slate-700 transition flex items-center gap-1" title="Download as Word Document preserving Headings & Formatting">
+                            <i class="fa-solid fa-file-word text-blue-400"></i> (.docx)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex-1 p-6 overflow-y-auto relative" id="output-container">
+                    <div id="output-empty" class="h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                        <div class="w-16 h-16 rounded-2xl bg-slate-800/60 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-4">
+                            <i class="fa-solid fa-quote-left text-2xl"></i>
+                        </div>
+                        <h3 class="text-sm font-semibold text-slate-300">No Citations Generated Yet</h3>
+                        <p class="text-xs text-slate-500 max-w-xs mt-1">Paste your manuscript on the left. The engine will run broad retrieval, hard filtering, re-ranking, and evidence verification.</p>
+                    </div>
+
+                    <div id="output-loading" class="hidden h-full min-h-[380px] flex flex-col items-center justify-center text-center p-6 space-y-5">
+                        <div class="relative">
+                            <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-brand-500 animate-spin"></div>
+                            <div class="absolute inset-0 flex items-center justify-center text-brand-400">
+                                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 id="loading-step-title" class="text-sm font-semibold text-slate-200">Executing 6-Stage Pipeline...</h3>
+                            <p id="loading-step-desc" class="text-xs text-slate-400 mt-1 max-w-sm">Generating focused entity queries and retrieving broad candidate pools...</p>
+                        </div>
+                        <div class="w-full max-w-sm space-y-1.5 text-left bg-slate-950/80 p-3.5 rounded-xl border border-slate-800/80 font-mono text-[11px]">
+                            <div id="step-1" class="flex items-center gap-2 text-slate-400">
+                                <i class="fa-solid fa-circle-notch animate-spin text-brand-400 step-icon"></i>
+                                <span>1. Section & Element Protection</span>
+                            </div>
+                            <div id="step-2" class="flex items-center gap-2 text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>2. Domain Query & Entity Extraction</span>
+                            </div>
+                            <div id="step-3" class="flex items-center gap-2 text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>3. Scoped Candidate Retrieval (PubMed/EuropePMC)</span>
+                            </div>
+                            <div id="step-4" class="flex items-center gap-2 text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>4. Hard Discipline Filter (Block CS/Eng Venues)</span>
+                            </div>
+                            <div id="step-5" class="flex items-center gap-2 text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>5. Re-Ranking (Biomedical Keyword Overlap)</span>
+                            </div>
+                            <div id="step-6" class="flex items-center gap-2 text-slate-500 opacity-60">
+                                <i class="fa-solid fa-circle text-slate-700 step-icon"></i>
+                                <span>6. Evidence Verification & High Confidence Match</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="output-content" class="hidden space-y-6">
+                        <div class="prose prose-invert max-w-none text-slate-200 text-sm leading-relaxed whitespace-pre-wrap font-sans bg-slate-950/40 p-5 rounded-xl border border-slate-800/80" id="cited-body">
+                        </div>
+
+                        <div class="relative py-2">
+                            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-800"></div></div>
+                            <div class="relative flex justify-center">
+                                <span class="bg-slate-900 px-3 text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <i class="fa-solid fa-book-open text-brand-400"></i> List of References
+                                </span>
+                            </div>
+                        </div>
+
+                        <div id="references-list" class="space-y-3">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="citation-deck-section" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
+            <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                <div class="flex items-center gap-2">
+                    <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                        <i class="fa-solid fa-shield-check text-base"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-sm font-semibold text-slate-100">6-Stage Funnel Inspection & Confidence Ratings</h2>
+                        <p class="text-xs text-slate-400">Shows re-rank score, entity matching, abstract similarity, and verified DOI.</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span id="field-database-badge" class="px-3 py-1 bg-rose-500/10 text-rose-300 border border-rose-500/20 text-xs font-semibold rounded-full flex items-center gap-1">
+                        <i class="fa-solid fa-database text-[10px]"></i> PubMed Engine Active
+                    </span>
+                    <span id="dedupe-count-badge" class="px-3 py-1 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-xs font-semibold rounded-full flex items-center gap-1">
+                        <i class="fa-solid fa-copy text-[10px]"></i> 0 Duplicates Prevented
+                    </span>
+                    <span id="verified-count-badge" class="px-3 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 text-xs font-semibold rounded-full">
+                        0 Unique References
+                    </span>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800">
+                        <tr>
+                            <th class="p-3 w-12">Index</th>
+                            <th class="p-3">In-Text Tag</th>
+                            <th class="p-3">Matched Article Title</th>
+                            <th class="p-3">Authors & Year</th>
+                            <th class="p-3">Confidence Score</th>
+                            <th class="p-3">Target Database</th>
+                            <th class="p-3">Verified DOI / Identifier</th>
+                            <th class="p-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="citation-table-body" class="divide-y divide-slate-800/60 font-sans">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="border-t border-slate-800/80 bg-slate-900/60 py-4 px-6 text-center text-xs text-slate-400">
+        <p>©Baig AA, 2026, Branded Methods Educators</p>
+    </footer>
+
+    <div id="modal-paper-detail" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+            <button id="btn-close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+                <span id="modal-tag" class="px-2.5 py-1 bg-brand-500/10 text-brand-300 border border-brand-500/20 text-xs font-semibold rounded-md font-mono">
+                    [1, Author et al., 2024]
+                </span>
+                <span id="modal-score" class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold rounded-full font-mono">
+                    Match Confidence: 88%
+                </span>
+                <span id="modal-usage-count" class="px-2 py-0.5 bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-[11px] font-medium rounded-full font-mono">
+                    1 Reference Occurrence
+                </span>
+            </div>
+            
+            <h3 id="modal-title" class="text-base font-semibold text-slate-100 leading-snug">Paper Title Here</h3>
+            
+            <div class="text-xs text-slate-400 space-y-1">
+                <p><strong class="text-slate-300">Authors:</strong> <span id="modal-authors">Author List</span></p>
+                <p><strong class="text-slate-300">Journal/Venue:</strong> <span id="modal-journal">Journal Name</span> (<span id="modal-year">Year</span>)</p>
+                <p><strong class="text-slate-300">Database Engine:</strong> <span id="modal-source-db" class="text-rose-400 font-semibold">PubMed / EuropePMC</span></p>
+                <p><strong class="text-slate-300">DOI / Identifier:</strong> <a id="modal-doi-link" href="#" target="_blank" class="text-brand-400 underline font-mono hover:text-brand-300">https://doi.org/...</a></p>
+            </div>
+
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <span class="text-[11px] font-mono uppercase text-slate-500 block">Abstract Snippet / Evidence Match Context:</span>
+                <p id="modal-abstract-text" class="text-xs text-slate-300 leading-relaxed italic max-h-32 overflow-y-auto pr-1">
+                    Abstract text snippet will be rendered here.
+                </p>
+            </div>
+
+            <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <span class="text-[11px] font-mono uppercase text-slate-500 block">Associated In-Text Claim Contexts:</span>
+                <div id="modal-claims-container" class="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                <a id="btn-modal-doi" href="#" target="_blank" class="px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Article / DOI
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toast-msg" class="text-xs font-medium">Notification message</span>
+    </div>
+
+    <script>
+        // DOM Elements
+        var inputText, btnProcess, btnReset, btnLoadMedical, fileUpload;
+        var btnCopyText, btnDownload, btnDownloadDocx;
+        var outputEmpty, outputLoading, outputContent, citedBody, referencesList;
+        var citationDeckSection, citationTableBody, verifiedCountBadge, dedupeCountBadge, fieldDatabaseBadge;
+        var modalPaperDetail, btnCloseModal;
+        var textStats;
+
+        var currentCitations = [];
+        var processedFullDocument = "";
+        var duplicateCount = 0;
+
+        const STOP_WORDS = new Set([
+            "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", 
+            "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can", "cannot", "could", 
+            "did", "do", "does", "doing", "down", "during", "each", "few", "for", "from", "further", "had", "has", "have", 
+            "having", "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into", "is", 
+            "it", "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "of", "off", "on", 
+            "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should", 
+            "so", "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there", "these", 
+            "they", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what", 
+            "when", "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself", 
+            "yourselves", "paper", "study", "results", "table", "figure", "shows", "demonstrates", "evaluated", "suggests",
+            "however", "furthermore", "moreover", "in", "summary", "conclusion", "method", "methods"
+        ]);
+
+        function initDOMElements() {
+            inputText = document.getElementById('input-text');
+            btnProcess = document.getElementById('btn-process');
+            btnReset = document.getElementById('btn-reset');
+            btnLoadMedical = document.getElementById('btn-load-medical');
+            fileUpload = document.getElementById('file-upload');
+            btnCopyText = document.getElementById('btn-copy-text');
+            btnDownload = document.getElementById('btn-download');
+            btnDownloadDocx = document.getElementById('btn-download-docx');
+            outputEmpty = document.getElementById('output-empty');
+            outputLoading = document.getElementById('output-loading');
+            outputContent = document.getElementById('output-content');
+            citedBody = document.getElementById('cited-body');
+            referencesList = document.getElementById('references-list');
+            citationDeckSection = document.getElementById('citation-deck-section');
+            citationTableBody = document.getElementById('citation-table-body');
+            verifiedCountBadge = document.getElementById('verified-count-badge');
+            dedupeCountBadge = document.getElementById('dedupe-count-badge');
+            fieldDatabaseBadge = document.getElementById('field-database-badge');
+            modalPaperDetail = document.getElementById('modal-paper-detail');
+            btnCloseModal = document.getElementById('btn-close-modal');
+            textStats = document.getElementById('text-stats');
+        }
+
+        function updateStats() {
+            if (!inputText || !textStats) return;
+            const text = inputText.value.trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            const chars = text.length;
+            textStats.textContent = words + ' words | ' + chars + ' characters';
+        }
+
+        function showToast(message, type) {
+            type = type || 'info';
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            if (!toast || !toastMsg || !toastIcon) return;
+
+            toastMsg.textContent = message;
+
+            if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-lg';
+            } else if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-brand-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(function() {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        function updateStepUI(stepNum, status, title, desc) {
+            const stepTitle = document.getElementById('loading-step-title');
+            const stepDesc = document.getElementById('loading-step-desc');
+            
+            if (stepTitle && title) stepTitle.textContent = title;
+            if (stepDesc && desc) stepDesc.textContent = desc;
+
+            for (let i = 1; i <= 6; i++) {
+                const el = document.getElementById('step-' + i);
+                if (!el) continue;
+                const icon = el.querySelector('.step-icon');
+
+                if (i < stepNum) {
+                    el.className = 'flex items-center gap-2 text-emerald-400 font-medium opacity-100';
+                    if (icon) icon.className = 'fa-solid fa-circle-check text-emerald-400 step-icon';
+                } else if (i === stepNum) {
+                    el.className = 'flex items-center gap-2 text-brand-300 font-semibold opacity-100';
+                    if (icon) icon.className = 'fa-solid fa-circle-notch animate-spin text-brand-400 step-icon';
+                } else {
+                    el.className = 'flex items-center gap-2 text-slate-500 opacity-60';
+                    if (icon) icon.className = 'fa-solid fa-circle text-slate-700 step-icon';
+                }
+            }
+        }
+
+        // Section Protection Rules
+        function isHeadingLine(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            if (/^#{1,6}\s+/.test(trimmed)) return true;
+            if (/^\d+(\.\d+)*\s+[A-Z]/.test(trimmed) && trimmed.length < 80) return true;
+            if (/^(Abstract|Executive Summary|Introduction|Background|Methods|Methodology|Results|Discussion|Conclusion|Conclusions|In Summary|Concluding Remarks|References|Bibliography|Works Cited|Literature Cited)$/i.test(trimmed)) return true;
+            if (trimmed.length < 60 && /^[A-Z0-9\s\:\-\,]+$/.test(trimmed) && !/[.!?]$/.test(trimmed)) return true;
+            return false;
+        }
+
+        function isAbstractHeader(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            if (trimmed.length > 80) return false;
+            if (/^(?:#+\s*)?(?:Abstract|Executive Summary)\s*$/i.test(trimmed)) return true;
+            if (/^(?:#+\s*)?(?:Abstract|Executive Summary)[\:\-\—\.]+\s*$/i.test(trimmed)) return true;
+            return false;
+        }
+
+        function isConclusionHeader(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            if (trimmed.length > 80) return false;
+            if (/^(?:#+\s*)?(?:Conclusion|Conclusions|Concluding Remarks)\s*$/i.test(trimmed)) return true;
+            if (/^(?:#+\s*)?(?:Conclusion|Conclusions|Concluding Remarks)[\:\-\—\.]+\s*$/i.test(trimmed)) return true;
+            return false;
+        }
+
+        function isTableOrFigureLine(line) {
+            if (!line) return false;
+            const trimmed = line.trim();
+            if (/^\|.*\|$/.test(trimmed) || /^\+[-+]+\+$/.test(trimmed)) return true;
+            if (/^(Table|Figure|Fig\.|Tab\.|Scheme|Chart|Plate)\s*\d*[:\.\s]/i.test(trimmed) && trimmed.length < 180) return true;
+            if (/^!?\[.*\]\(.*\)/.test(trimmed) || /^\[?(Image|Figure|Table)\b/i.test(trimmed)) return true;
+            if (/^(Source|Note|Notes|Legend|Caption):/i.test(trimmed)) return true;
+            return false;
+        }
+
+        function separateBodyAndExistingReferences(text) {
+            const refHeaderRegex = /(?:\n|^)\s*(?:#+\s*)?(?:References|Bibliography|Works Cited|Literature Cited)\s*(?:\n|$)/i;
+            const match = text.match(refHeaderRegex);
+
+            if (!match) {
+                return { bodyText: text, existingRefItems: [] };
+            }
+
+            const splitIndex = match.index;
+            const bodyText = text.substring(0, splitIndex).trim();
+            const refSectionText = text.substring(splitIndex + match[0].length).trim();
+
+            const rawLines = refSectionText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+            const existingRefItems = [];
+
+            rawLines.forEach((line) => {
+                const doiMatch = line.match(/(?:https?:\/\/doi\.org\/|doi:\s*)(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+                const doi = doiMatch ? doiMatch[1] : null;
+
+                const yearMatch = line.match(/\b(19\d\d|20\d\d)\b/);
+                const year = yearMatch ? yearMatch[1] : '2024';
+
+                const authorMatch = line.match(/^([A-Za-z\-]+)(?:,|\s+[A-Z]\.)/);
+                let firstAuthorSurname = authorMatch ? authorMatch[1] : 'Author';
+                
+                if (firstAuthorSurname.toLowerCase() === 'anonymous') return;
+
+                existingRefItems.push({
+                    rawText: line,
+                    doi: doi,
+                    doiUrl: doi ? 'https://doi.org/' + doi : null,
+                    firstAuthorSurname: firstAuthorSurname,
+                    year: year,
+                    source: 'Manuscript Reference'
+                });
+            });
+
+            return { bodyText: bodyText, existingRefItems: existingRefItems };
+        }
+
+        function extractClaimsFromText(text, density) {
+            const blocks = text.split(/\n\s*\n/);
+            const claims = [];
+            let isInsideExcludedHeader = false;
+
+            blocks.forEach((block, pIdx) => {
+                const trimmedBlock = block.trim();
+                if (!trimmedBlock) return;
+
+                const lines = trimmedBlock.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length === 0) return;
+
+                const firstLine = lines[0];
+
+                if (isAbstractHeader(firstLine) || isConclusionHeader(firstLine)) {
+                    isInsideExcludedHeader = true;
+                    return;
+                }
+
+                if (isHeadingLine(firstLine)) {
+                    if (/^(?:#+\s*)?(?:References|Bibliography|Works Cited|Literature Cited)/i.test(firstLine) || isAbstractHeader(firstLine) || isConclusionHeader(firstLine)) {
+                        isInsideExcludedHeader = true;
+                        return;
+                    } else {
+                        isInsideExcludedHeader = false;
+                        if (lines.length === 1) return;
+                    }
+                }
+
+                if (isInsideExcludedHeader) return;
+                if (lines.every(l => isTableOrFigureLine(l))) return;
+
+                const nonHeadingLines = lines.filter(l => !isHeadingLine(l) && !isTableOrFigureLine(l) && !isAbstractHeader(l) && !isConclusionHeader(l));
+                const blockTextToAnalyze = nonHeadingLines.join(' ');
+
+                if (!blockTextToAnalyze || blockTextToAnalyze.length < 20) return;
+
+                const rawSentences = blockTextToAnalyze.match(/[^.!?]+[.!?]+/g) || [blockTextToAnalyze];
+                const cleanSentences = rawSentences
+                    .map(s => s.trim())
+                    .filter(s => s.length > 20 && !isHeadingLine(s) && !isTableOrFigureLine(s) && !isAbstractHeader(s) && !isConclusionHeader(s));
+
+                if (cleanSentences.length === 0) return;
+
+                const targetCount = (density === 'dense') ? Math.min(cleanSentences.length, 3) : Math.min(cleanSentences.length, 2);
+
+                for (let i = 0; i < targetCount; i++) {
+                    const sentence = cleanSentences[i];
+                    claims.push({
+                        paragraphIndex: pIdx + 1,
+                        sentenceContext: sentence,
+                        cleanText: sentence.replace(/^[0-9\.\s]+/, '')
+                    });
+                }
+            });
+
+            return claims;
+        }
+
+        // ==========================================
+        // 6-STAGE PIPELINE LOGIC IMPLEMENTATION
+        // ==========================================
+
+        // Stage 1: Domain-Scoped Query Generation
+        function generateQueriesFromClaim(claimText, field) {
+            const words = claimText
+                .toLowerCase()
+                .replace(/[^\w\s\-]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+
+            const capitalEntities = claimText.match(/\b[A-Z][a-zA-Z0-9\-]{2,}\b/g) || [];
+            const cleanEntities = capitalEntities.filter(e => !STOP_WORDS.has(e.toLowerCase()));
+
+            const uniqueTerms = Array.from(new Set([...cleanEntities, ...words]));
+            
+            let query1 = uniqueTerms.slice(0, 6).join(' ');
+            let query2 = uniqueTerms.slice(0, 4).join(' ');
+
+            // Inject strict domain anchoring keywords
+            if (field === 'med') {
+                query1 += ' clinical medicine patient therapy';
+                query2 += ' medicine clinical';
+            } else if (field === 'life') {
+                query1 += ' biology molecular cellular';
+                query2 += ' biology life sciences';
+            } else if (field === 'eng') {
+                query1 += ' algorithm engineering computer system';
+                query2 += ' engineering technology';
+            } else if (field === 'phys') {
+                query1 += ' physics mathematics quantum theory';
+                query2 += ' physics math';
+            } else if (field === 'social') {
+                query1 += ' social science study psychology humanities';
+                query2 += ' social science';
+            }
+
+            return { primaryQuery: query1, secondaryQuery: query2, keywords: uniqueTerms };
+        }
+
+        // Tokenizer for similarity calculations
+        function extractTokens(text) {
+            if (!text) return [];
+            return text
+                .toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+        }
+
+        // Stage 2: Broad Candidate Retrieval
+        async function retrieveBroadCandidates(queries, field, recencyFilter) {
+            const candidates = [];
+
+            const primaryQ = encodeURIComponent(queries.primaryQuery);
+            const secondaryQ = encodeURIComponent(queries.secondaryQuery);
+
+            let fetchPromises = [];
+
+            // PubMed / EuropePMC API (Primary engine for Medical & Life Sciences)
+            if (field === 'med' || field === 'life' || field === 'multi') {
+                const epmcQuery = (field === 'med') ? `${primaryQ}+AND+(SRC:MED+OR+SRC:PMC)` : primaryQ;
+                const p1 = fetch(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${epmcQuery}&format=json&pageSize=30`)
+                    .then(r => r.ok ? r.json() : null)
+                    .then(data => {
+                        if (data?.resultList?.result) {
+                            data.resultList.result.forEach(item => {
+                                candidates.push({
+                                    source: 'PubMed / EuropePMC',
+                                    doi: item.doi || (item.pmid ? `PMC/PMID:${item.pmid}` : null),
+                                    doiUrl: item.doi ? 'https://doi.org/' + item.doi : (item.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${item.pmid}/` : '#'),
+                                    title: item.title ? item.title.replace(/\.$/, '') : '',
+                                    abstract: item.abstractText || '',
+                                    authors: item.authorString ? item.authorString.split(', ').map(a => a.trim()) : [],
+                                    year: item.pubYear ? item.pubYear.toString() : '2024',
+                                    journal: item.journalTitle || 'Medical Journal',
+                                    pubType: item.pubType || 'Journal Article'
+                                });
+                            });
+                        }
+                    }).catch(e => console.warn(e));
+                fetchPromises.push(p1);
+            }
+
+            // arXiv Engine
+            if (field === 'eng' || field === 'phys' || field === 'multi') {
+                const p2 = fetch(`https://export.arxiv.org/api/query?search_query=all:${primaryQ}&start=0&max_results=25`)
+                    .then(r => r.ok ? r.text() : null)
+                    .then(xmlText => {
+                        if (xmlText) {
+                            const parser = new DOMParser();
+                            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+                            const entries = xmlDoc.getElementsByTagName("entry");
+                            for (let i = 0; i < entries.length; i++) {
+                                const entry = entries[i];
+                                const title = entry.getElementsByTagName("title")[0]?.textContent?.replace(/\n/g, ' ')?.trim() || '';
+                                const summary = entry.getElementsByTagName("summary")[0]?.textContent?.trim() || '';
+                                const pub = entry.getElementsByTagName("published")[0]?.textContent || '2024';
+                                const authorEls = entry.getElementsByTagName("author");
+                                const authorList = [];
+                                for (let j = 0; j < authorEls.length; j++) {
+                                    const n = authorEls[j].getElementsByTagName("name")[0]?.textContent;
+                                    if (n) authorList.push(n);
+                                }
+                                const idEl = entry.getElementsByTagName("id")[0]?.textContent || '';
+                                const arxivId = idEl.split('/abs/').pop() || 'arXiv';
+
+                                candidates.push({
+                                    source: 'arXiv Open Access Engine',
+                                    doi: `10.48550/arXiv.${arxivId}`,
+                                    doiUrl: idEl || `https://arxiv.org/abs/${arxivId}`,
+                                    title: title,
+                                    abstract: summary,
+                                    authors: authorList,
+                                    year: pub.substring(0, 4),
+                                    journal: 'arXiv Repository',
+                                    pubType: 'Preprint'
+                                });
+                            }
+                        }
+                    }).catch(e => console.warn(e));
+                fetchPromises.push(p2);
+            }
+
+            // Crossref Registry (Scoped domain query)
+            let crossrefSearchTerm = secondaryQ;
+            if (field === 'med') {
+                crossrefSearchTerm += '+medicine+clinical';
+            }
+            let crossrefUrl = `https://api.crossref.org/works?query=${crossrefSearchTerm}&rows=25&mailto=citeverify@academic.edu`;
+            if (recencyFilter === 'latest' || recencyFilter === 'strictly_recent') {
+                crossrefUrl += '&filter=from-pub-date:2020-01-01';
+            }
+            const p3 = fetch(crossrefUrl)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (data?.message?.items) {
+                        data.message.items.forEach(item => {
+                            if (item.title && item.title.length > 0) {
+                                const authorList = item.author ? item.author.map(a => (a.given ? a.given + ' ' : '') + (a.family || '')).filter(Boolean) : [];
+                                let yr = '2024';
+                                if (item['published-print']?.['date-parts']?.[0]?.[0]) yr = item['published-print']['date-parts'][0][0].toString();
+                                else if (item.created?.['date-parts']?.[0]?.[0]) yr = item.created['date-parts'][0][0].toString();
+
+                                candidates.push({
+                                    source: 'Crossref Registry',
+                                    doi: item.DOI,
+                                    doiUrl: 'https://doi.org/' + item.DOI,
+                                    title: item.title[0],
+                                    abstract: item.abstract ? item.abstract.replace(/<[^>]+>/g, '') : '',
+                                    authors: authorList,
+                                    year: yr,
+                                    journal: item['container-title']?.[0] || 'Academic Journal',
+                                    pubType: item.type || 'journal-article'
+                                });
+                            }
+                        });
+                    }
+                }).catch(e => console.warn(e));
+            fetchPromises.push(p3);
+
+            await Promise.all(fetchPromises);
+            return candidates;
+        }
+
+        // Stage 3: Hard Discipline Filtering
+        function hardFilterCandidates(candidates, recencyFilter, field) {
+            const csEngJournalsRegex = /\b(IEEE|ACM|IEEE\/ACM|Robotics|Circuits?|Semiconductor|Antennas|Power Electronics|Structural Engineering|Mechanical Engineering|Civil Engineering|Software Engineering|VLSI|Telecommunications|AIAA|ASME|Automotive|Sae Technical|Turbomachinery|Computer Vision|Neural Networks)\b/i;
+
+            return candidates.filter(item => {
+                if (!item.title || item.title.length < 10) return false;
+                if (!item.doi) return false;
+                if (!item.authors || item.authors.length === 0) return false;
+
+                // Anonymous Author check
+                const firstAuthor = item.authors[0].toLowerCase();
+                if (firstAuthor.includes('anonymous') || firstAuthor.includes('unknown') || firstAuthor === 'author') return false;
+
+                // Publication type check
+                const lowerTitle = item.title.toLowerCase();
+                if (lowerTitle.startsWith('retraction:') || lowerTitle.startsWith('erratum:') || lowerTitle.includes('author correction')) return false;
+                if (item.pubType && (item.pubType.includes('Correction') || item.pubType.includes('Retraction'))) return false;
+
+                // Hard Discipline Exclusion: Filter out CS & Engineering journals in Medical/Life Sciences
+                if (field === 'med' || field === 'life') {
+                    const venueContext = (item.journal + ' ' + item.source + ' ' + item.title).toLowerCase();
+                    if (csEngJournalsRegex.test(venueContext)) {
+                        return false;
+                    }
+                }
+
+                // Date filter
+                const yr = parseInt(item.year, 10);
+                if (recencyFilter === 'strictly_recent' && (isNaN(yr) || yr < 2020)) {
+                    return false;
+                }
+
+                return true;
+            });
+        }
+
+        // Stage 4: Re-Ranking with Biomedical Domain Penalty & Weighting
+        function reRankCandidates(claimText, candidates, field) {
+            const claimTokens = extractTokens(claimText);
+            const claimTokenSet = new Set(claimTokens);
+
+            const capitalEntities = claimText.match(/\b[A-Z][a-zA-Z0-9\-]{2,}\b/g) || [];
+            const entitySet = new Set(capitalEntities.map(e => e.toLowerCase()));
+
+            const medKeywords = new Set([
+                "clinical", "medicine", "medical", "patient", "patients", "therapy", "therapeutic", "treatment", 
+                "disease", "hospital", "cancer", "tumor", "tumors", "survival", "efficacy", "dosage", "drug", 
+                "trial", "trials", "cell", "cells", "gene", "protein", "expression", "antibody", "antibodies", 
+                "immunotherapy", "oncology", "pathology", "pharmacology", "diagnosis", "syndrome", "blood", 
+                "serum", "receptor", "biomarker", "biomarkers", "in vivo", "in vitro", "human", "health"
+            ]);
+
+            const engKeywords = new Set([
+                "algorithm", "algorithms", "circuit", "circuits", "software", "hardware", "microprocessor", 
+                "semiconductor", "voltage", "current", "antenna", "robot", "robotics", "mechanical", "structural", 
+                "cad", "cam", "finite element", "mesh", "matlab", "fpga", "cuda", "ethernet", "bandwidth"
+            ]);
+
+            return candidates.map(paper => {
+                const titleTokens = extractTokens(paper.title);
+                const abstractTokens = extractTokens(paper.abstract);
+                const fullTextContext = (paper.title + " " + paper.abstract + " " + paper.journal).toLowerCase();
+
+                // Title Similarity
+                let titleMatches = 0;
+                titleTokens.forEach(t => { if (claimTokenSet.has(t)) titleMatches++; });
+                const titleScore = titleTokens.length > 0 ? (titleMatches / Math.sqrt(claimTokens.length * titleTokens.length)) : 0;
+
+                // Abstract Similarity
+                let abstractMatches = 0;
+                abstractTokens.forEach(t => { if (claimTokenSet.has(t)) abstractMatches++; });
+                const abstractScore = abstractTokens.length > 0 ? (abstractMatches / Math.sqrt(claimTokens.length * abstractTokens.length)) : 0;
+
+                // Entity Match Bonus
+                let entityMatches = 0;
+                entitySet.forEach(ent => {
+                    if (paper.title.toLowerCase().includes(ent) || paper.abstract.toLowerCase().includes(ent)) {
+                        entityMatches++;
+                    }
+                });
+                const entityBonus = entitySet.size > 0 ? (entityMatches / entitySet.size) * 0.25 : 0;
+
+                // Domain Relevance & Penalty Factor
+                let domainMultiplier = 1.0;
+                if (field === 'med') {
+                    // Boost native biomedical databases
+                    if (paper.source.includes('PubMed') || paper.source.includes('EuropePMC')) {
+                        domainMultiplier *= 1.30;
+                    }
+                    
+                    let medMatchCount = 0;
+                    medKeywords.forEach(kw => {
+                        if (fullTextContext.includes(kw)) medMatchCount++;
+                    });
+                    
+                    if (medMatchCount >= 2) {
+                        domainMultiplier *= 1.20;
+                    } else if (medMatchCount === 0 && paper.source.includes('Crossref')) {
+                        // Severe penalty if Crossref returns non-medical items in Medical Mode
+                        domainMultiplier *= 0.20;
+                    }
+
+                    // Strict penalty if engineering words occur
+                    let engPenaltyCount = 0;
+                    engKeywords.forEach(kw => {
+                        if (fullTextContext.includes(kw)) engPenaltyCount++;
+                    });
+                    if (engPenaltyCount > 0) {
+                        domainMultiplier *= 0.10;
+                    }
+                } else if (field === 'eng') {
+                    if (paper.source.includes('arXiv')) {
+                        domainMultiplier *= 1.20;
+                    }
+                }
+
+                // Calculate total match confidence score
+                const baseScore = (titleScore * 0.50) + (abstractScore * 0.35) + entityBonus;
+                const totalScore = Math.min(1.0, baseScore * domainMultiplier);
+
+                return {
+                    paper: paper,
+                    confidenceScore: parseFloat(totalScore.toFixed(3)),
+                    titleScore: parseFloat(titleScore.toFixed(3)),
+                    abstractScore: parseFloat(abstractScore.toFixed(3)),
+                    entityBonus: parseFloat(entityBonus.toFixed(3))
+                };
+            }).sort((a, b) => b.confidenceScore - a.confidenceScore);
+        }
+
+        // Stage 5 & 6: Verification Threshold
+        function selectVerifiedCitation(rankedCandidates, minConfidenceSetting) {
+            let threshold = 0.30;
+            if (minConfidenceSetting === 'strict') threshold = 0.45;
+            if (minConfidenceSetting === 'medium') threshold = 0.20;
+
+            if (rankedCandidates.length === 0) return null;
+
+            const topMatch = rankedCandidates[0];
+            
+            // Require minimum score threshold for verification
+            if (topMatch.confidenceScore >= threshold) {
+                return topMatch;
+            }
+
+            // Fallback match condition
+            if (topMatch.confidenceScore >= 0.15) {
+                return topMatch;
+            }
+
+            return null;
+        }
+
+        function formatInTextTag(index, authorTag, year, style) {
+            switch (style) {
+                case 'vancouver':
+                    return '(' + index + ')';
+                case 'nlm':
+                case 'superscript':
+                    return '<sup>' + index + '</sup>';
+                case 'ieee':
+                case 'numeric':
+                    return '[' + index + ']';
+                case 'apa':
+                case 'harvard':
+                case 'author_year':
+                    return '(' + authorTag + ', ' + year + ')';
+                case 'mla':
+                case 'chicago':
+                    return '(' + authorTag + ' ' + year + ')';
+                case 'combined':
+                default:
+                    return '[' + index + ', ' + authorTag + ', ' + year + ']';
+            }
+        }
+
+        function formatBibEntryText(item, style) {
+            const p = item.paper;
+            const authors = p.authors || [p.firstAuthorSurname || 'Author'];
+            const year = p.year || '2024';
+            const title = p.title || 'Untitled';
+            const journal = p.journal || '';
+            const doiStr = (p.doi && p.doi !== 'N/A (Document Ref)') ? (p.doi.startsWith('http') ? p.doi : 'https://doi.org/' + p.doi) : '';
+
+            let formattedAuthors = '';
+            
+            switch (style) {
+                case 'apa':
+                    formattedAuthors = authors.length > 7 ? authors.slice(0, 6).join(', ') + ', ... ' + authors[authors.length - 1] : authors.join(', ');
+                    return formattedAuthors + ' (' + year + '). ' + title + '. ' + (journal ? journal + '. ' : '') + doiStr;
+
+                case 'vancouver':
+                case 'nlm':
+                    formattedAuthors = authors.slice(0, 6).map(a => a.replace(/,/g, '')).join(', ');
+                    if (authors.length > 6) formattedAuthors += ', et al.';
+                    return item.index + '. ' + formattedAuthors + '. ' + title + '. ' + (journal ? journal + '. ' : '') + year + '. ' + doiStr;
+
+                case 'ieee':
+                    formattedAuthors = authors.length > 3 ? authors[0] + ' et al.' : authors.join(' and ');
+                    return '[' + item.index + '] ' + formattedAuthors + ',"' + title + '," ' + (journal ? journal + ', ' : '') + year + '. ' + doiStr;
+
+                case 'mla':
+                    formattedAuthors = authors.length > 2 ? authors[0] + ', et al.' : authors.join(', and ');
+                    return formattedAuthors + '. "' + title + '." ' + (journal ? journal + ', ' : '') + year + '. ' + doiStr;
+
+                case 'chicago':
+                case 'harvard':
+                    formattedAuthors = authors.length > 3 ? authors[0] + ' et al.' : authors.join(', ');
+                    return formattedAuthors + '. ' + year + '. "' + title + '." ' + (journal ? journal + '. ' : '') + doiStr;
+
+                case 'combined':
+                case 'numeric':
+                case 'superscript':
+                default:
+                    formattedAuthors = authors.length > 3 ? authors.slice(0, 3).join(', ') + ' et al.' : authors.join(', ');
+                    return '[' + item.index + '] ' + (formattedAuthors ? formattedAuthors + ' ' : '') + '(' + year + '). ' + title + '. ' + (journal ? journal + '. ' : '') + doiStr;
+            }
+        }
+
+        function renderResults(fullText, citations) {
+            if (!citedBody || !referencesList) return;
+
+            let formattedHtml = fullText;
+            const selectStyle = document.getElementById('select-citation-style');
+            const citationStyle = selectStyle ? selectStyle.value : 'apa';
+            
+            citations.forEach(function(item) {
+                if (!item.isExisting) {
+                    const tagPattern = item.inTextTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    let badgeHtml = '';
+                    if (citationStyle === 'superscript' || citationStyle === 'nlm') {
+                        badgeHtml = '<sup class="citation-badge font-bold text-xs" data-index="' + item.index + '" onclick="openPaperModal(' + item.index + ')">' + item.index + '</sup>';
+                    } else {
+                        badgeHtml = '<span class="citation-badge" data-index="' + item.index + '" onclick="openPaperModal(' + item.index + ')"><i class="fa-solid fa-bookmark text-[10px] mr-1"></i>' + item.inTextTag + '</span>';
+                    }
+                    formattedHtml = formattedHtml.replace(new RegExp(tagPattern, 'g'), badgeHtml);
+                }
+            });
+
+            formattedHtml = formattedHtml
+                .replace(/^#\s+(.+)$/gm, '<h1 class="text-xl font-bold text-white border-b border-slate-800 pb-2 mb-3 mt-4">$1</h1>')
+                .replace(/^##\s+(.+)$/gm, '<h2 class="text-lg font-bold text-slate-100 mb-2 mt-4">$1</h2>')
+                .replace(/^###\s+(.+)$/gm, '<h3 class="text-base font-semibold text-slate-200 mb-2 mt-3">$1</h3>');
+
+            citedBody.innerHTML = formattedHtml;
+
+            referencesList.innerHTML = '';
+            let referenceTextBuffer = "\n\nReferences (" + citationStyle.toUpperCase() + " Style)\n\n";
+
+            citations.forEach(function(item) {
+                const p = item.paper;
+                
+                const refElement = document.createElement('div');
+                refElement.className = "p-3.5 bg-slate-950/60 hover:bg-slate-950 border border-slate-800/80 rounded-xl transition text-xs flex items-start gap-3 group";
+                
+                const badgeColor = item.isExisting 
+                    ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' 
+                    : 'bg-brand-500/10 text-brand-400 border-brand-500/20';
+
+                const sourceLabel = item.isExisting ? 'Manuscript Reference' : p.source;
+
+                const doiHtml = (p.doi && p.doi !== 'N/A (Document Ref)') 
+                    ? '<a href="' + p.doiUrl + '" target="_blank" class="text-brand-400 hover:text-brand-300 font-mono text-[11px] underline flex items-center gap-1"><i class="fa-solid fa-link text-[10px]"></i> ' + (p.doi.startsWith('http') ? p.doi : 'https://doi.org/' + p.doi) + '</a>' 
+                    : '<span class="text-[11px] font-mono text-slate-500">No DOI provided</span>';
+
+                const scoreHtml = item.confidenceScore !== undefined 
+                    ? '<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono"><i class="fa-solid fa-gauge-high text-[9px] mr-1"></i>Score: ' + Math.round(item.confidenceScore * 100) + '% Match</span>' 
+                    : '';
+
+                const formattedBibEntry = formatBibEntryText(item, citationStyle);
+
+                refElement.innerHTML = 
+                    '<span class="font-mono font-bold ' + badgeColor + ' px-2 py-0.5 rounded border text-[11px] mt-0.5 shrink-0">[' + item.index + ']</span>' +
+                    '<div class="flex-1 space-y-1">' +
+                        '<div class="text-slate-200 font-medium leading-snug">' + formattedBibEntry + '</div>' +
+                        '<div class="flex items-center gap-3 pt-1 flex-wrap">' +
+                            doiHtml +
+                            '<span class="text-[10px] text-rose-300 font-medium flex items-center gap-1"><i class="fa-solid fa-circle-check text-emerald-400"></i> ' + sourceLabel + '</span>' +
+                            scoreHtml +
+                        '</div>' +
+                    '</div>' +
+                    '<button onclick="openPaperModal(' + item.index + ')" class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-white p-1.5 rounded bg-slate-800 transition text-xs">' +
+                        '<i class="fa-solid fa-eye"></i>' +
+                    '</button>';
+
+                referencesList.appendChild(refElement);
+
+                referenceTextBuffer += formattedBibEntry + '\n';
+            });
+
+            processedFullDocument = fullText + referenceTextBuffer;
+            renderTableDeck(citations);
+        }
+
+        function renderTableDeck(citations) {
+            if (!citationTableBody || !verifiedCountBadge || !dedupeCountBadge || !fieldDatabaseBadge) return;
+
+            const fieldSelect = document.getElementById('select-field');
+            const fieldVal = fieldSelect ? fieldSelect.value : 'med';
+            const fieldLabels = {
+                med: 'PubMed / EuropePMC Active (CS Excluded)',
+                life: 'Life Sciences / EuropePMC Active',
+                eng: 'arXiv / CS Engine Active',
+                phys: 'arXiv / Physics Active',
+                social: 'Crossref / Social Sci Active',
+                multi: 'Crossref Registry Active'
+            };
+
+            fieldDatabaseBadge.innerHTML = `<i class="fa-solid fa-database text-[10px]"></i> ${fieldLabels[fieldVal] || 'PubMed Engine Active'}`;
+
+            citationTableBody.innerHTML = '';
+            verifiedCountBadge.textContent = citations.length + ' Unique References';
+            dedupeCountBadge.innerHTML = '<i class="fa-solid fa-copy text-[10px]"></i> ' + duplicateCount + ' Duplicates Bypassed';
+
+            citations.forEach(function(item) {
+                const p = item.paper;
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-900/80 transition border-b border-slate-800/40";
+
+                const authorStr = p.authors ? p.authors.join(', ') : (p.firstAuthorSurname || 'Author');
+                const doiLink = (p.doi && p.doi !== 'N/A (Document Ref)')
+                    ? '<a href="' + p.doiUrl + '" target="_blank" class="text-brand-400 hover:underline font-mono text-[11px]">' + p.doi + '</a>'
+                    : '<span class="text-slate-500 font-mono text-[11px]">N/A</span>';
+
+                const scoreDisplay = item.confidenceScore !== undefined 
+                    ? '<span class="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono rounded text-[11px] font-bold">' + Math.round(item.confidenceScore * 100) + '% Confidence</span>' 
+                    : '<span class="text-slate-500 font-mono text-[11px]">Existing</span>';
+
+                tr.innerHTML = 
+                    '<td class="p-3 font-mono font-bold text-brand-400">[' + item.index + ']</td>' +
+                    '<td class="p-3 font-mono text-slate-300">' + item.inTextTag + '</td>' +
+                    '<td class="p-3 font-medium text-slate-100 max-w-xs truncate" title="' + p.title + '">' + p.title + '</td>' +
+                    '<td class="p-3 text-slate-400 max-w-xs truncate">' + authorStr + ' (' + p.year + ')</td>' +
+                    '<td class="p-3">' + scoreDisplay + '</td>' +
+                    '<td class="p-3 text-rose-300 font-medium text-[11px]">' + p.source + '</td>' +
+                    '<td class="p-3">' + doiLink + '</td>' +
+                    '<td class="p-3 text-right">' +
+                        '<button onclick="openPaperModal(' + item.index + ')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] transition">' +
+                            'Inspect' +
+                        '</button>' +
+                    '</td>';
+
+                citationTableBody.appendChild(tr);
+            });
+        }
+
+        function openPaperModal(index) {
+            if (!currentCitations || currentCitations.length === 0 || !modalPaperDetail) return;
+            const item = currentCitations.find(c => c.index === index);
+            if (!item) return;
+
+            const p = item.paper;
+            document.getElementById('modal-tag').textContent = item.inTextTag;
+            document.getElementById('modal-title').textContent = p.title;
+            document.getElementById('modal-authors').textContent = p.authors ? p.authors.join(', ') : 'Authors';
+            document.getElementById('modal-journal').textContent = p.journal || 'Academic Venue';
+            document.getElementById('modal-year').textContent = p.year || '2024';
+            document.getElementById('modal-source-db').textContent = p.source;
+
+            const scoreEl = document.getElementById('modal-score');
+            if (scoreEl) {
+                if (item.confidenceScore !== undefined) {
+                    scoreEl.textContent = 'Match Confidence: ' + Math.round(item.confidenceScore * 100) + '%';
+                    scoreEl.classList.remove('hidden');
+                } else {
+                    scoreEl.classList.add('hidden');
+                }
+            }
+
+            const abstractEl = document.getElementById('modal-abstract-text');
+            if (abstractEl) {
+                abstractEl.textContent = p.abstract ? '"' + p.abstract.slice(0, 400) + '..."' : 'Full-text metadata verified via database lookup.';
+            }
+
+            const doiLink = document.getElementById('modal-doi-link');
+            const modalDoiBtn = document.getElementById('btn-modal-doi');
+            if (p.doi && p.doi !== 'N/A (Document Ref)') {
+                doiLink.href = p.doiUrl;
+                doiLink.textContent = p.doiUrl;
+                modalDoiBtn.href = p.doiUrl;
+                modalDoiBtn.classList.remove('hidden');
+            } else {
+                doiLink.href = '#';
+                doiLink.textContent = 'No DOI available';
+                modalDoiBtn.classList.add('hidden');
+            }
+
+            document.getElementById('modal-usage-count').textContent = item.frequency + ' Reference Occurrence(s)';
+
+            const claimsContainer = document.getElementById('modal-claims-container');
+            claimsContainer.innerHTML = '';
+            item.claims.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'text-xs text-slate-300 italic p-1.5 bg-slate-900 rounded border border-slate-800/80';
+                div.textContent = '"' + c + '"';
+                claimsContainer.appendChild(div);
+            });
+
+            modalPaperDetail.classList.remove('hidden');
+        }
+
+        function parseInlineRuns(text, docxLib) {
+            const runs = [];
+            if (!currentCitations || currentCitations.length === 0) {
+                runs.push(new docxLib.TextRun({ text: text, font: "Calibri", size: 23 }));
+                return runs;
+            }
+
+            const selectStyle = document.getElementById('select-citation-style');
+            const citationStyle = selectStyle ? selectStyle.value : 'apa';
+            const citationTags = currentCitations.map(function(c) {
+                return c.inTextTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            });
+
+            const citationRegex = new RegExp('(' + citationTags.join('|') + ')', 'g');
+            const parts = text.split(citationRegex);
+
+            parts.forEach(function(part) {
+                if (!part) return;
+
+                const matchedCitation = currentCitations.find(function(c) { return c.inTextTag === part.trim(); });
+
+                if (matchedCitation) {
+                    if (citationStyle === 'superscript' || citationStyle === 'nlm') {
+                        runs.push(new docxLib.TextRun({
+                            text: matchedCitation.index.toString(),
+                            superScript: true,
+                            bold: true,
+                            color: "4F46E5",
+                            font: "Calibri"
+                        }));
+                    } else {
+                        runs.push(new docxLib.TextRun({
+                            text: ' ' + part.trim() + ' ',
+                            bold: true,
+                            color: "4F46E5",
+                            font: "Calibri",
+                            size: 22
+                        }));
+                    }
+                } else {
+                    const boldParts = part.split(/(\*\*[^*]+\*\*)/g);
+                    boldParts.forEach(function(bPart) {
+                        if (!bPart) return;
+                        if (/^\*\*[^*]+\*\*$/.test(bPart)) {
+                            runs.push(new docxLib.TextRun({
+                                text: bPart.replace(/\*\*/g, ''),
+                                bold: true,
+                                font: "Calibri",
+                                size: 23
+                            }));
+                        } else {
+                            runs.push(new docxLib.TextRun({
+                                text: bPart,
+                                font: "Calibri",
+                                size: 23
+                            }));
+                        }
+                    });
+                }
+            });
+
+            return runs;
+        }
+
+        function saveAsBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function copyToClipboard(text) {
+            let success = false;
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '-9999px';
+                textarea.setAttribute('readonly', '');
+                document.body.appendChild(textarea);
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+                
+                success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+            } catch (e) {
+                console.warn('execCommand copy failed:', e);
+            }
+
+            if (!success && navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(function(err) {
+                    console.warn('Clipboard API error:', err);
+                });
+            }
+        }
+
+        // Sample Medical & Health Sciences Paper
+        const medicalSampleText = `# Efficacy of Monoclonal Antibodies in Targeted Immunotherapy for Advanced Solid Tumors
+
+Abstract
+Monoclonal antibodies (mAbs) have revolutionized oncology by specifically targeting tumor-associated antigens and immune checkpoints. This paper evaluates the clinical efficacy, adverse effect profiles, and therapeutic responses associated with novel mAb regimens in clinical trial cohorts.
+
+## 1. Introduction and Clinical Rationale
+Targeted immunotherapy represents a paradigm shift in medical oncology, replacing non-specific cytotoxic chemotherapy with precision molecular targeting. Programmed cell death protein 1 (PD-1) and programmed death-ligand 1 (PD-L1) inhibitors enhance endogenous T-cell responses against neoantigen-expressing tumor cells. Clinical trials in patients with metastatic melanoma and non-small cell lung cancer demonstrate marked improvements in overall survival and progression-free survival. However, immune-related adverse events such as colitis, pneumonitis, and endocrinopathies necessitate strict patient monitoring protocols.
+
+Table 1: Clinical Trial Efficacy Metrics of Immune Checkpoint Inhibitors
+| mAb Agent | Target Antigen | Overall Response Rate (%) | Median PFS (Months) |
+| Pembrolizumab | PD-1 | 44.8% | 11.2 months |
+| Nivolumab | PD-1 | 40.2% | 9.8 months |
+
+Figure 1: Mechanism of action illustrating T-cell disinhibition following PD-1 receptor blockade in tumor microenvironments.
+
+## 2. Biomarkers and Patient Stratification
+Identifying predictive biomarkers is paramount for optimizing patient selection and minimizing unnecessary treatment toxicity. Tumor mutational burden (TMB) and microsatellite instability (MSI-High) serve as robust indicators of immunotherapy responsiveness across diverse tumor histologies. High-throughput genomic sequencing allows oncologists to tailor antibody combinations based on individual patient molecular signatures. Furthermore, quantitative spatial profiling of tumor-infiltrating lymphocytes provides crucial diagnostic insight into cold versus inflamed tumor phenotypes.
+
+## 3. Therapeutic Challenges and Future Directions
+Despite notable clinical breakthroughs, primary and acquired resistance to mAb therapy remains a substantial clinical obstacle. Future investigation must emphasize rational combination strategies, such as pairing immune checkpoint inhibitors with anti-angiogenic agents or targeted small-molecule inhibitors. Expanding global access to biosimilar antibodies will also prove vital in reducing treatment costs and improving patient outcomes in low-resource medical settings.
+
+Conclusion
+In summary, monoclonal antibody immunotherapies have transformed modern oncological care. By isolating structural headers, abstract sections, and diagnostic tables from artificial citations while strictly anchoring body clinical claims to verified PubMed and MEDLINE literature, scientific accuracy is maintained.`;
+
+        function setupEventListeners() {
+            if (btnProcess) {
+                btnProcess.addEventListener('click', async function() {
+                    const rawText = inputText ? inputText.value.trim() : '';
+                    if (!rawText) {
+                        showToast('Please enter text or upload a document first.', 'error');
+                        return;
+                    }
+
+                    const selectedField = document.getElementById('select-field')?.value || 'med';
+                    const density = document.getElementById('select-density')?.value || 'standard';
+                    const recencyFilter = document.getElementById('select-recency')?.value || 'latest';
+                    const citationStyle = document.getElementById('select-citation-style')?.value || 'apa';
+                    const citationPos = document.getElementById('select-citation-pos')?.value || 'before';
+                    const minConfSetting = document.getElementById('select-min-confidence')?.value || 'high';
+
+                    if (outputEmpty) outputEmpty.classList.add('hidden');
+                    if (outputContent) outputContent.classList.add('hidden');
+                    if (citationDeckSection) citationDeckSection.classList.add('hidden');
+                    if (outputLoading) outputLoading.classList.remove('hidden');
+
+                    try {
+                        // Stage 1: Section Protection
+                        updateStepUI(1, 'active', '1. Section & Element Protection', 'Bypassing Headings, Abstract, Tables, Figures, and Conclusions...');
+                        
+                        const splitData = separateBodyAndExistingReferences(rawText);
+                        const bodyText = splitData.bodyText;
+                        const existingRefItems = splitData.existingRefItems;
+
+                        let claims = extractClaimsFromText(bodyText, density);
+                        
+                        if (!claims || claims.length === 0) {
+                            const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l.length > 25 && !isHeadingLine(l));
+                            if (lines.length > 0) {
+                                claims = lines.map((l, i) => ({
+                                    paragraphIndex: i + 1,
+                                    sentenceContext: l,
+                                    cleanText: l
+                                }));
+                            }
+                        }
+
+                        if (!claims || claims.length === 0) {
+                            throw new Error('Please enter standard text paragraphs to generate body citations.');
+                        }
+
+                        // Stage 2: Domain Query Generation
+                        updateStepUI(2, 'active', '2. Domain Query & Entity Extraction', 'Extracting biomedical terms & expanding domain query...');
+
+                        let verifiedCitations = [];
+                        const doiMap = new Map();
+                        let indexCounter = 1;
+                        duplicateCount = 0;
+
+                        for (let claimIndex = 0; claimIndex < claims.length; claimIndex++) {
+                            const claim = claims[claimIndex];
+                            
+                            // 1. Query Generation
+                            const queries = generateQueriesFromClaim(claim.cleanText, selectedField);
+
+                            // 2. Broad Candidate Retrieval
+                            updateStepUI(3, 'active', `3. Scoped Retrieval (${claimIndex + 1}/${claims.length})`, `Searching ${selectedField.toUpperCase()} databases for biomedical candidates...`);
+                            const rawCandidates = await retrieveBroadCandidates(queries, selectedField, recencyFilter);
+
+                            // 3. Hard Discipline Filter
+                            updateStepUI(4, 'active', `4. Hard Discipline Filter (${claimIndex + 1}/${claims.length})`, `Disqualifying CS, Engineering & IEEE/ACM venues in Medical mode...`);
+                            const filteredCandidates = hardFilterCandidates(rawCandidates, recencyFilter, selectedField);
+
+                            // 4. Re-Ranking
+                            updateStepUI(5, 'active', `5. Re-Ranking (${claimIndex + 1}/${claims.length})`, `Scoring biomedical keyword overlap & applying domain penalties...`);
+                            const rankedCandidates = reRankCandidates(claim.cleanText, filteredCandidates, selectedField);
+
+                            // 5. Evidence Verification & 6. High Confidence Selection
+                            updateStepUI(6, 'active', `6. Evidence Verification (${claimIndex + 1}/${claims.length})`, `Checking confidence match score threshold...`);
+                            const bestMatch = selectVerifiedCitation(rankedCandidates, minConfSetting);
+
+                            if (bestMatch) {
+                                const paper = bestMatch.paper;
+                                const dedupeKey = (paper.doi && paper.doi !== 'N/A') 
+                                    ? paper.doi.toLowerCase().trim() 
+                                    : paper.title.toLowerCase().trim().replace(/[^\w]/g, '');
+
+                                if (doiMap.has(dedupeKey)) {
+                                    const existingObj = doiMap.get(dedupeKey);
+                                    existingObj.claims.push(claim.sentenceContext);
+                                    existingObj.frequency += 1;
+                                    claim.assignedTag = existingObj.inTextTag;
+                                    duplicateCount++;
+                                } else {
+                                    const firstAuthorSurname = paper.authors[0] ? paper.authors[0].split(' ').pop() : 'Author';
+                                    let authorTag = "";
+                                    if (paper.authors.length === 1) {
+                                        authorTag = firstAuthorSurname;
+                                    } else if (paper.authors.length === 2) {
+                                        const secondSurname = paper.authors[1].split(' ').pop();
+                                        authorTag = firstAuthorSurname + ' & ' + secondSurname;
+                                    } else {
+                                        authorTag = firstAuthorSurname + ' et al.';
+                                    }
+
+                                    const inTextTag = formatInTextTag(indexCounter, authorTag, paper.year, citationStyle);
+
+                                    const citationObj = {
+                                        index: indexCounter,
+                                        paragraphIndex: claim.paragraphIndex,
+                                        claimContext: claim.sentenceContext,
+                                        claims: [claim.sentenceContext],
+                                        inTextTag: inTextTag,
+                                        paper: paper,
+                                        confidenceScore: bestMatch.confidenceScore,
+                                        frequency: 1,
+                                        isExisting: false
+                                    };
+
+                                    verifiedCitations.push(citationObj);
+                                    doiMap.set(dedupeKey, citationObj);
+                                    claim.assignedTag = inTextTag;
+                                    indexCounter++;
+                                }
+                            }
+                        }
+
+                        // Process existing pre-pasted document references if any
+                        if (existingRefItems && existingRefItems.length > 0) {
+                            for (let eIdx = 0; eIdx < existingRefItems.length; eIdx++) {
+                                const existingItem = existingRefItems[eIdx];
+                                const dedupeKey = (existingItem.doi && existingItem.doi !== 'N/A')
+                                    ? existingItem.doi.toLowerCase().trim()
+                                    : existingItem.rawText.toLowerCase().trim().replace(/[^\w]/g, '');
+
+                                if (doiMap.has(dedupeKey)) {
+                                    const existingObj = doiMap.get(dedupeKey);
+                                    existingObj.frequency += 1;
+                                    duplicateCount++;
+                                    continue;
+                                }
+
+                                const paperObj = {
+                                    source: existingItem.source,
+                                    doi: existingItem.doi || 'N/A (Document Ref)',
+                                    doiUrl: existingItem.doiUrl || '#',
+                                    title: existingItem.rawText,
+                                    authors: [existingItem.firstAuthorSurname],
+                                    firstAuthorSurname: existingItem.firstAuthorSurname,
+                                    year: existingItem.year,
+                                    journal: 'Manuscript Source Reference'
+                                };
+
+                                const citationObj = {
+                                    index: indexCounter,
+                                    paragraphIndex: 'Ref',
+                                    claimContext: 'Pre-existing document reference merged into bibliography',
+                                    claims: ['Pre-existing document reference merged into bibliography'],
+                                    inTextTag: formatInTextTag(indexCounter, existingItem.firstAuthorSurname + ' et al.', existingItem.year, citationStyle),
+                                    paper: paperObj,
+                                    confidenceScore: 1.0,
+                                    frequency: 1,
+                                    isExisting: true
+                                };
+
+                                verifiedCitations.push(citationObj);
+                                doiMap.set(dedupeKey, citationObj);
+                                indexCounter++;
+                            }
+                        }
+
+                        if (verifiedCitations.length === 0) {
+                            throw new Error('No papers satisfied the 6-stage biomedical threshold. Try adjusting the Min Score or Research Field.');
+                        }
+
+                        let updatedText = bodyText;
+                        claims.forEach(function(claim) {
+                            if (claim.assignedTag && claim.sentenceContext && updatedText.includes(claim.sentenceContext)) {
+                                const matchPunct = claim.sentenceContext.match(/^([\s\S]+?)([.!?]+)$/);
+                                let searchStr = '';
+
+                                if (matchPunct) {
+                                    const sentenceCore = matchPunct[1].trimEnd();
+                                    const punct = matchPunct[2];
+                                    
+                                    if (citationPos === 'before') {
+                                        searchStr = sentenceCore + ' ' + claim.assignedTag + punct;
+                                    } else {
+                                        searchStr = sentenceCore + punct + ' ' + claim.assignedTag;
+                                    }
+                                } else {
+                                    searchStr = claim.sentenceContext + ' ' + claim.assignedTag;
+                                }
+
+                                if (!updatedText.includes(searchStr)) {
+                                    updatedText = updatedText.replace(claim.sentenceContext, searchStr);
+                                }
+                            }
+                        });
+
+                        currentCitations = verifiedCitations;
+
+                        renderResults(updatedText, verifiedCitations);
+
+                        if (outputLoading) outputLoading.classList.add('hidden');
+                        if (outputContent) outputContent.classList.remove('hidden');
+                        if (citationDeckSection) citationDeckSection.classList.remove('hidden');
+                        if (btnCopyText) btnCopyText.disabled = false;
+                        if (btnDownload) btnDownload.disabled = false;
+                        if (btnDownloadDocx) btnDownloadDocx.disabled = false;
+
+                        showToast('6-Stage Evidence Match complete! Citations strictly verified for Medical Science.', 'success');
+
+                    } catch (err) {
+                        console.error(err);
+                        if (outputLoading) outputLoading.classList.add('hidden');
+                        if (outputEmpty) outputEmpty.classList.remove('hidden');
+                        showToast(err.message || 'Error executing citation pipeline', 'error');
+                    }
+                });
+            }
+
+            if (btnCloseModal) {
+                btnCloseModal.addEventListener('click', function() {
+                    if (modalPaperDetail) modalPaperDetail.classList.add('hidden');
+                });
+            }
+
+            if (btnCopyText) {
+                btnCopyText.addEventListener('click', function() {
+                    if (!processedFullDocument) return;
+                    copyToClipboard(processedFullDocument);
+                    showToast('Full cited manuscript copied to clipboard!', 'success');
+                });
+            }
+
+            if (btnDownload) {
+                btnDownload.addEventListener('click', function() {
+                    if (!processedFullDocument) return;
+                    const blob = new Blob([processedFullDocument], { type: 'text/markdown' });
+                    saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.md');
+                    showToast('Downloaded formatted Markdown document', 'success');
+                });
+            }
+
+            if (btnDownloadDocx) {
+                btnDownloadDocx.addEventListener('click', async function() {
+                    if (!processedFullDocument || currentCitations.length === 0) return;
+                    
+                    showToast('Generating Word (.docx) document with preserved headings...', 'info');
+
+                    try {
+                        if (window.docx) {
+                            const docxLib = window.docx;
+                            const docChildren = [];
+
+                            docChildren.push(new docxLib.Paragraph({
+                                children: [
+                                    new docxLib.TextRun({ text: "Cited Academic Manuscript", bold: true, size: 32, font: "Calibri", color: "1E293B" })
+                                ],
+                                spacing: { after: 300 }
+                            }));
+
+                            const rawBodyText = processedFullDocument.split(/\n\s*\n\s*References\s*\n\s*/i)[0];
+                            const blocks = rawBodyText.split(/\n\s*\n/);
+
+                            blocks.forEach(block => {
+                                const trimmed = block.trim();
+                                if (!trimmed) return;
+
+                                if (/^#\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^#\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 30, font: "Calibri", color: "0F172A" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_1,
+                                        spacing: { before: 360, after: 160 }
+                                    }));
+                                } else if (/^##\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^##\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 26, font: "Calibri", color: "334155" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_2,
+                                        spacing: { before: 280, after: 120 }
+                                    }));
+                                } else if (/^###\s+(.+)/.test(trimmed)) {
+                                    const headingText = trimmed.replace(/^###\s+/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: headingText, bold: true, size: 24, font: "Calibri", color: "475569" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_3,
+                                        spacing: { before: 220, after: 100 }
+                                    }));
+                                } else if (isHeadingLine(trimmed)) {
+                                    const cleanHeader = trimmed.replace(/^#+\s*/, '').replace(/\*\*/g, '');
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: [
+                                            new docxLib.TextRun({ text: cleanHeader, bold: true, size: 26, font: "Calibri", color: "1E293B" })
+                                        ],
+                                        heading: docxLib.HeadingLevel.HEADING_2,
+                                        spacing: { before: 280, after: 120 }
+                                    }));
+                                } else {
+                                    const runs = parseInlineRuns(trimmed, docxLib);
+                                    docChildren.push(new docxLib.Paragraph({
+                                        children: runs,
+                                        spacing: { after: 200, line: 360 }
+                                    }));
+                                }
+                            });
+
+                            docChildren.push(new docxLib.Paragraph({
+                                children: [
+                                    new docxLib.TextRun({ text: "References", bold: true, size: 28, font: "Calibri", color: "0F172A" })
+                                ],
+                                heading: docxLib.HeadingLevel.HEADING_1,
+                                spacing: { before: 440, after: 220 }
+                            }));
+
+                            currentCitations.forEach(function(item) {
+                                const p = item.paper;
+                                const authorString = p.authors.length > 3 
+                                    ? p.authors.slice(0, 3).join(', ') + ' et al.' 
+                                    : p.authors.join(', ');
+
+                                const doiText = (p.doi && p.doi !== 'N/A (Document Ref)') ? (p.doi.startsWith('http') ? p.doi : 'https://doi.org/' + p.doi) : '';
+
+                                docChildren.push(new docxLib.Paragraph({
+                                    children: [
+                                        new docxLib.TextRun({ text: '[' + item.index + '] ', bold: true, font: "Calibri", size: 22, color: "4F46E5" }),
+                                        new docxLib.TextRun({ text: (authorString ? authorString + ' ' : '') + '(' + p.year + '). ', font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: p.title + '. ', italics: true, font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: (p.journal ? p.journal + '. ' : ''), font: "Calibri", size: 22 }),
+                                        new docxLib.TextRun({ text: doiText, color: "2563EB", font: "Calibri", size: 22 })
+                                    ],
+                                    spacing: { after: 140, line: 280 }
+                                }));
+                            });
+
+                            const doc = new docxLib.Document({
+                                sections: [{
+                                    properties: {
+                                        page: {
+                                            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+                                        }
+                                    },
+                                    children: docChildren
+                                }]
+                            });
+
+                            const blob = await docxLib.Packer.toBlob(doc);
+                            saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.docx');
+                            showToast('Downloaded Word (.docx) with preserved headings!', 'success');
+                        } else {
+                            const htmlContent = 
+                                '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+                                '<head><meta charset="utf-8"><title>CiteVerify Manuscript</title></head>' +
+                                '<body style="font-family: Calibri, sans-serif; line-height: 1.6; padding: 40px; color: #1e293b;">' +
+                                    '<div style="font-size: 14px; margin-bottom: 24px;">' + citedBody.innerHTML + '</div>' +
+                                    '<h2 style="font-size: 18px; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin-top: 32px; color: #0f172a;">References</h2>' +
+                                    '<div style="font-size: 12px;">' + referencesList.innerHTML + '</div>' +
+                                '</body>' +
+                                '</html>';
+                            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+                            saveAsBlob(blob, 'CiteVerify_Manuscript_' + Date.now() + '.docx');
+                            showToast('Downloaded Word (.docx) document', 'success');
+                        }
+                    } catch (err) {
+                        console.error("Docx generation error:", err);
+                        showToast('Failed to generate .docx document', 'error');
+                    }
+                });
+            }
+
+            if (btnLoadMedical) {
+                btnLoadMedical.addEventListener('click', () => {
+                    if (inputText) {
+                        inputText.value = medicalSampleText;
+                        const fieldSelect = document.getElementById('select-field');
+                        if (fieldSelect) fieldSelect.value = 'med';
+                        updateStats();
+                        showToast('Loaded sample Medical & Health Sciences manuscript!', 'info');
+                    }
+                });
+            }
+
+            if (fileUpload) {
+                fileUpload.addEventListener('change', async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const fileName = file.name.toLowerCase();
+                    showToast(`Loading ${file.name}...`, 'info');
+
+                    try {
+                        if (fileName.endsWith('.docx')) {
+                            if (!window.mammoth) throw new Error('Mammoth.js library not loaded');
+                            const arrayBuffer = await file.arrayBuffer();
+                            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+                            if (inputText) {
+                                inputText.value = result.value;
+                                updateStats();
+                                showToast('Parsed Word (.docx) document successfully!', 'success');
+                            }
+                        } else if (fileName.endsWith('.pdf')) {
+                            if (!window.pdfjsLib) throw new Error('PDF.js library not loaded');
+                            const arrayBuffer = await file.arrayBuffer();
+                            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                            let fullText = '';
+                            for (let i = 1; i <= pdf.numPages; i++) {
+                                const page = await pdf.getPage(i);
+                                const tokenContent = await page.getTextContent();
+                                const pageText = tokenContent.items.map(item => item.str).join(' ');
+                                fullText += pageText + '\n\n';
+                            }
+                            if (inputText) {
+                                inputText.value = fullText;
+                                updateStats();
+                                showToast('Parsed PDF document successfully!', 'success');
+                            }
+                        } else if (fileName.endsWith('.doc')) {
+                            showToast('Legacy .doc files are not natively supported. Please save as .docx or .txt', 'error');
+                        } else {
+                            const text = await file.text();
+                            if (inputText) {
+                                inputText.value = text;
+                                updateStats();
+                                showToast('Parsed text file successfully!', 'success');
+                            }
+                        }
+                    } catch (err) {
+                        console.error('File reading error:', err);
+                        showToast(`Error parsing file: ${err.message}`, 'error');
+                    }
+                });
+            }
+
+            if (btnReset) {
+                btnReset.addEventListener('click', () => {
+                    if (inputText) inputText.value = '';
+                    updateStats();
+                    if (outputContent) outputContent.classList.add('hidden');
+                    if (citationDeckSection) citationDeckSection.classList.add('hidden');
+                    if (outputLoading) outputLoading.classList.add('hidden');
+                    if (outputEmpty) outputEmpty.classList.remove('hidden');
+                    if (btnCopyText) btnCopyText.disabled = true;
+                    if (btnDownload) btnDownload.disabled = true;
+                    if (btnDownloadDocx) btnDownloadDocx.disabled = true;
+                    currentCitations = [];
+                    processedFullDocument = '';
+                    showToast('Reset application state.', 'info');
+                });
+            }
+
+            if (inputText) {
+                inputText.addEventListener('input', updateStats);
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                initDOMElements();
+                setupEventListeners();
+                updateStats();
+            });
+        } else {
+            initDOMElements();
+            setupEventListeners();
+            updateStats();
+        }
+    </script>
+</body>
+</html>
